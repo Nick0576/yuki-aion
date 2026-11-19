@@ -1,0 +1,85 @@
+# Render Blueprint for the shared Yuki/Eroq backend.
+# Secrets are prompted in the Render Dashboard (sync: false) — never stored here.
+# Persistent disk keeps Eroq usage counters and scene state across deploys/restarts.
+# Service name stays yuki-aion-backend so the existing Render URL remains stable.
+
+previews:
+  generation: off
+
+services:
+  - type: web
+    name: yuki-aion-backend
+    runtime: node
+    plan: 0.5c-512mb # paid plan required for a persistent disk; no free-plan sleep
+    region: singapore # closest to the PH user base; cannot be changed after creation
+    numInstances: 1 # a disk-attached service cannot be scaled
+    buildCommand: npm install
+    startCommand: node server.mjs
+    healthCheckPath: /api/health
+
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: "8787"
+      - key: VIDEO_CACHE_DIR
+        value: /data
+
+      # Required private secrets — Render prompts for these on first deploy.
+      - key: EROQ_API_KEY
+        sync: false
+      - key: KOOLBASE_SECRET_KEY
+        sync: false
+
+      # Generated once and kept stable by Render; signs video clip URLs.
+      - key: CLIP_SIGNING_SECRET
+        generateValue: true
+
+      # Non-secret Eroq configuration (values match server.mjs defaults).
+      - key: EROQ_BASE_URL
+        value: https://eroq.ai/v1
+      - key: EROQ_ENABLED
+        value: "1"
+      - key: EROQ_DEFAULT_MODEL
+        value: eroq-rp-mini
+
+      # Shared limits and safety bounds.
+      - key: EROQ_LIMIT_GUEST_HOURLY
+        value: "6"
+      - key: EROQ_LIMIT_GUEST_DAILY
+        value: "30"
+      - key: EROQ_LIMIT_USER_HOURLY
+        value: "30"
+      - key: EROQ_LIMIT_USER_DAILY
+        value: "200"
+      - key: EROQ_GLOBAL_DAILY_CREDITS
+        value: "300"
+      - key: EROQ_MAX_CONCURRENT
+        value: "4"
+      - key: EROQ_TIMEOUT_MS
+        value: "90000"
+      - key: EROQ_DUP_TTL_SECONDS
+        value: "120"
+      - key: EROQ_QUOTA_COOLDOWN_SECONDS
+        value: "300"
+      - key: EROQ_ACCOUNT_CACHE_SECONDS
+        value: "60"
+      - key: EROQ_MAX_INPUT_CHARS
+        value: "12000"
+      - key: EROQ_MAX_MSG_CHARS
+        value: "4000"
+      - key: EROQ_MAX_OUTPUT_TOKENS
+        value: "800"
+      - key: EROQ_MAX_TEXT_CHARS
+        value: "12000"
+
+      # Do NOT add YUKI_DEV_NO_AUTH here. Eroq must require a Yuki cloud user
+      # or a server-issued guest session, never an anonymous provider call.
+
+    disk:
+      name: yuki-data
+      mountPath: /data
+      sizeGB: 1
